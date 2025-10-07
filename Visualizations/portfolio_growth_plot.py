@@ -23,4 +23,4 @@ def plot_portfolio_growth(years, portfolio_values, selected_factors=None, restri
     plt.ylabel('Portfolio Value ($)')
     plt.grid(True)
     plt.tight_layout()
-    plt.show()
+    #plt.show()

@@ -5,7 +5,8 @@ def get_factors(available_factors):
     print("\nAvailable factors: ")
     for i in range(len(available_factors)):
         print(f"{i + 1}. {available_factors[i]}")
-    
+
+
     # Get the number of factors user wants to use
     while(True):
         try:
@@ -20,7 +21,8 @@ def get_factors(available_factors):
             continue
         else:
             break
-    
+
+
     # Get the selected factors
     factors = []
     for i in range(num):
@@ -37,7 +39,8 @@ def get_factors(available_factors):
                 continue
             else:
                 break
-        
+
+
         match available_factors[selected_factor - 1]:
             case "ROE using 9/30 Data":
                 factors.append(factor_function.ROE())
@@ -68,8 +71,9 @@ def get_factors(available_factors):
             case "Next-Year\'s Return %":
                 factors.append(factor_function.NextYrReturn())
             case "Next-Year\'s Active Return %":
-                factors.append(factor_function.NextYrActiveReturn())    
+                factors.append(factor_function.NextYrActiveReturn())
             case _:
                 print(f"factor {available_factors[selected_factor - 1]} is not available.")
-    
+
+
     return factors

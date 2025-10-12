@@ -30,7 +30,7 @@ class MarketObject:
         except KeyError:
             if self.verbosity >= 2:
                 print(f"{ticker} not found in market data for {self.t}")
-            return None
+            #return None
 
     # Optional: helper to fetch all market data from Supabase
     def fetch_market_data(supabase_url, supabase_key):

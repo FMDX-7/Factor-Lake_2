@@ -10,7 +10,7 @@ def main(supabase_url, supabase_key):
     restrict_fossil_fuels = get_fossil_fuel_restriction()
 
     # Load data
-    rdata = MarketObject.load_data(supabase_url, supabase_key)
+    rdata = data = fetch_market_data(supabase_url, supabase_key)
 
     # Optional filtering
     if restrict_fossil_fuels and 'FactSet Industry' in rdata.columns:

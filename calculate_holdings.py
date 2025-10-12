@@ -26,7 +26,7 @@ def calculate_holdings(factor, aum, market, restrict_fossil_fuels=False):
     top_10_percent = sorted_securities[:max(1, len(sorted_securities) // 10)]
 
     # Calculate number of shares for each selected security
-    portfolio_new = Portfolio(name=f"Portfolio_{market.t}")
+    portfolio_new = Portfolio(name=f"Portfolio_{market.year}")
     equal_investment = aum / len(top_10_percent)
 
     for ticker, _ in top_10_percent:
@@ -56,7 +56,7 @@ def calculate_growth(portfolio, next_market, current_market, verbosity=0):
                 if entry_price is not None:
                     total_end_value += inv["number_of_shares"] * entry_price
                     if verbosity == 3:
-                        print(f"{ticker} - Missing in {next_market.t}, liquidating at entry price: {entry_price}")
+                        print(f"{ticker} - Missing in {next_market.year}, liquidating at entry price: {entry_price}")
 
     # Calculate growth
     growth = (total_end_value - total_start_value) / total_start_value if total_start_value else 0

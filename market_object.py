@@ -1,54 +1,63 @@
 import pandas as pd
-import numpy as np
+from supabase import create_client, Client
+import os
 
-### CREATING FUNCTION TO LOAD DATA ###
+# Supabase credentials
+SUPABASE_URL = "https://xyzcompany.supabase.co"
+SUPABASE_KEY = "your-public-anon-key"
+
+# Initialize Supabase client
+supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+
 def load_data(restrict_fossil_fuels=False):
-    file_path = '/content/drive/My Drive/Cayuga Fund Factor Lake/FR2000 Annual Quant Data FOR RETURN SIMULATION.xlsx'
-    rdata = pd.read_excel(file_path, sheet_name='Data', header=2, skiprows=[3, 4])
+    """
+    Load market data from Supabase 'All' table and optionally filter fossil fuel industries.
+    Returns a pandas DataFrame with all required columns.
+    """
+    # Fetch all rows from 'All'
+    response = supabase.table("All").select("*").execute()
 
-    # Strip whitespace from column names and remove duplicates
+    if response.error:
+        raise Exception(f"Supabase query failed: {response.error}")
+
+    rdata = pd.DataFrame(response.data)
+
+    # Ensure correct column names
     rdata.columns = rdata.columns.str.strip()
-    rdata = rdata.loc[:, ~rdata.columns.duplicated(keep='first')]
+    rdata = rdata.loc[:, ~rdata.columns.duplicated()]
 
     # Add 'Ticker' column if missing
     if 'Ticker' not in rdata.columns and 'Ticker-Region' in rdata.columns:
         rdata['Ticker'] = rdata['Ticker-Region'].str.split('-').str[0].str.strip()
 
-    # Apply sector restriction logic
-    if restrict_fossil_fuels:
-        industry_col = 'FactSet Industry'
-        if industry_col in rdata.columns:
-            rdata[industry_col] = rdata[industry_col].astype(str).str.lower()
-            fossil_keywords = ['oil', 'gas', 'coal', 'energy', 'fossil']
-            mask = rdata[industry_col].apply(lambda x: not any(kw in x for kw in fossil_keywords))
-            rdata = rdata[mask]
-        else:
-            print("Warning: 'FactSet Industry' column not found. Fossil fuel filtering skipped.")
+    # Convert 'Date' to datetime & extract 'Year'
+    if 'Date' in rdata.columns:
+        rdata['Date'] = pd.to_datetime(rdata['Date'])
+        rdata['Year'] = rdata['Date'].dt.year
 
-    # Ensure 'Year' column is present
-    if 'Year' not in rdata.columns and 'Date' in rdata.columns:
-        rdata['Year'] = pd.to_datetime(rdata['Date']).dt.year
+    # Fossil fuel filtering
+    if restrict_fossil_fuels and 'FactSet Industry' in rdata.columns:
+        fossil_keywords = ['oil', 'gas', 'coal', 'energy', 'fossil']
+        rdata = rdata[rdata['FactSet Industry'].apply(lambda x: not any(kw in str(x).lower() for kw in fossil_keywords))]
 
     return rdata
 
-class MarketObject():
-    def __init__(self, data, t, verbosity=1):
-        """
-        data(DataFrame): Market data with columns like 'Ticker', 'Ending Price', etc.
-        t (int): Year of market data.
-        verbosity (int): Controls level of printed output. 0 = silent, 1 = normal, 2+ = verbose.
-        """
-        # Remove duplicated column names
+
+class MarketObject:
+    """
+    Wraps a pandas DataFrame from Supabase to provide ticker/year-based lookups.
+    """
+    def __init__(self, data: pd.DataFrame, t: int, verbosity=1):
         data.columns = data.columns.str.strip()
         data = data.loc[:, ~data.columns.duplicated(keep='first')]
 
-        # Ensure 'Ticker' and 'Year' columns are present
+        # Ensure Ticker and Year columns exist
         if 'Ticker' not in data.columns and 'Ticker-Region' in data.columns:
             data['Ticker'] = data['Ticker-Region'].str.split('-').str[0].str.strip()
         if 'Year' not in data.columns and 'Date' in data.columns:
             data['Year'] = pd.to_datetime(data['Date']).dt.year
 
-        # Define relevant columns
+        # Keep only relevant columns
         available_factors = [
             'ROE using 9/30 Data', 'ROA using 9/30 Data', '12-Mo Momentum %', '1-Mo Momentum %',
             'Price to Book Using 9/30 Data', 'Next FY Earns/P', '1-Yr Price Vol %', 'Accruals/Assets',
@@ -56,12 +65,10 @@ class MarketObject():
             "Next-Year's Return %", "Next-Year's Active Return %"
         ]
         keep_cols = ['Ticker', 'Ending Price', 'Year', '6-Mo Momentum %'] + available_factors
-
-        # Filter and clean data
         data = data[[col for col in keep_cols if col in data.columns]].copy()
         data.replace({'--': None}, inplace=True)
 
-        # Set 'Ticker' as the index for faster lookups
+        # Set index for fast lookup
         data.set_index('Ticker', inplace=True)
 
         self.stocks = data

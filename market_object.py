@@ -32,17 +32,17 @@ class MarketObject:
                 print(f"{ticker} not found in market data for {self.t}")
             return None
 
-# Optional: helper to fetch all market data from Supabase
-def fetch_market_data(supabase_url, supabase_key):
-    supabase: Client = create_client(supabase_url, supabase_key)
-    response = supabase.table("All").select("*").execute()
-    df = pd.DataFrame(response.data)
-
-    # Ensure 'Date' and 'Ticker'
-    if 'Date' in df.columns:
-        df['Date'] = pd.to_datetime(df['Date'])
-        df['Year'] = df['Date'].dt.year
-    if 'Ticker' not in df.columns and 'Ticker-Region' in df.columns:
-        df['Ticker'] = df['Ticker-Region'].str.split('-').str[0].str.strip()
-
-    return df
+    # Optional: helper to fetch all market data from Supabase
+    def fetch_market_data(supabase_url, supabase_key):
+        supabase: Client = create_client(supabase_url, supabase_key)
+        response = supabase.table("All").select("*").execute()
+        df = pd.DataFrame(response.data)
+    
+        # Ensure 'Date' and 'Ticker'
+        if 'Date' in df.columns:
+            df['Date'] = pd.to_datetime(df['Date'])
+            df['Year'] = df['Date'].dt.year
+        if 'Ticker' not in df.columns and 'Ticker-Region' in df.columns:
+            df['Ticker'] = df['Ticker-Region'].str.split('-').str[0].str.strip()
+    
+        return df

@@ -44,5 +44,4 @@ class MarketObject:
             df['Year'] = df['Date'].dt.year
         if 'Ticker' not in df.columns and 'Ticker-Region' in df.columns:
             df['Ticker'] = df['Ticker-Region'].str.split('-').str[0].str.strip()
-    
-        return df
+            return df

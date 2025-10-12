@@ -48,3 +48,11 @@ class MarketObject:
             df['Ticker'] = df['Ticker-Region'].str.split('-').str[0].str.strip()
 
         return df
+        
+    def get_price(self, ticker):
+        try:
+            return self.stocks.at[ticker, 'Ending Price']
+        except KeyError:
+            if self.verbosity >= 2:
+                print(f"{ticker} - not found in market data for {self.t} - SKIPPING")
+            return None

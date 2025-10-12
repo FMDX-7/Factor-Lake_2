@@ -1,21 +1,15 @@
 import pandas as pd
 from supabase import create_client, Client
+import os
 
-class MarketObject():
-    def __init__(self, data: pd.DataFrame = None, year: int = None, verbosity=1):
-        """
-        data: DataFrame of market data
-        year: Year of market data
-        verbosity: 0 = silent, 1 = normal, 2+ = verbose
-        """
-        if data is None:
-            raise ValueError("Data must be provided. Use fetch_from_supabase() to get it directly from the database.")
+class MarketObject:
+    def __init__(self, data: pd.DataFrame, year: int = None, verbosity=1):
+        self.year = year
+        self.verbosity = verbosity
 
-        # Remove duplicate columns and strip names
+        # Clean columns and ensure 'Ticker' & 'Year'
         data.columns = data.columns.str.strip()
         data = data.loc[:, ~data.columns.duplicated(keep='first')]
-
-        # Ensure 'Ticker' and 'Year' columns
         if 'Ticker' not in data.columns and 'Ticker-Region' in data.columns:
             data['Ticker'] = data['Ticker-Region'].str.split('-').str[0].str.strip()
         if 'Year' not in data.columns and 'Date' in data.columns:
@@ -30,19 +24,27 @@ class MarketObject():
         ]
         keep_cols = ['Ticker', 'Ending Price', 'Year', '6-Mo Momentum %'] + available_factors
         self.stocks = data[[col for col in keep_cols if col in data.columns]].copy()
-
-        # Clean data
         self.stocks.replace({'--': None}, inplace=True)
         self.stocks.set_index('Ticker', inplace=True)
 
-        self.year = year
-        self.verbosity = verbosity
-
     @staticmethod
-    def fetch_from_supabase(supabase_url: str, supabase_key: str):
-        """Fetch entire All table from Supabase as a DataFrame."""
-        supabase: Client = create_client(supabase_url, supabase_key)
-        result = supabase.table("All").select("*").execute()
-        if result.data is None:
+    def load_data(supabase_url: str = None, supabase_key: str = None):
+        """
+        Pulls the 'All' table from Supabase. If no keys provided, raises an error.
+        """
+        if supabase_url is None or supabase_key is None:
+            raise ValueError("Supabase URL and KEY must be provided")
+        client: Client = create_client(supabase_url, supabase_key)
+        result = client.table("All").select("*").execute()
+        if not result.data:
             raise ValueError("No data returned from Supabase")
-        return pd.DataFrame(result.data)
+        df = pd.DataFrame(result.data)
+
+        # Process columns
+        if 'Date' in df.columns:
+            df['Date'] = pd.to_datetime(df['Date'])
+            df['Year'] = df['Date'].dt.year
+        if 'Ticker' not in df.columns and 'Ticker-Region' in df.columns:
+            df['Ticker'] = df['Ticker-Region'].str.split('-').str[0].str.strip()
+
+        return df

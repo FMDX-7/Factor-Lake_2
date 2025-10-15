@@ -2,25 +2,32 @@ import pandas as pd
 import numpy as np
 from supabase_client import create_supabase_client
 import os
+from config import DEFAULT_TABLE_NAME
 
 ### CREATING FUNCTION TO LOAD DATA ###
-def load_data(restrict_fossil_fuels=False, use_supabase=True, table_name='All'):
+def load_data(restrict_fossil_fuels=False, use_supabase=True, table_name=None):
     """
     Load market data from either Supabase or Excel file (fallback).
     
     Args:
         restrict_fossil_fuels (bool): Whether to exclude fossil fuel companies
         use_supabase (bool): If True, use Supabase; if False, use Excel fallback
-        table_name (str): Name of Supabase table containing market data
+        table_name (str): Name of Supabase table containing market data (defaults to DEFAULT_TABLE_NAME from config)
     
     Returns:
         pandas.DataFrame: Market data
     """
     
+    # Use default table name from config if not specified
+    if table_name is None:
+        table_name = DEFAULT_TABLE_NAME
+    
     if use_supabase:
         try:
             # Create Supabase client
             client = create_supabase_client()
+            
+            print(f"Connecting to Supabase table: '{table_name}'")
             
             # Load data from Supabase
             rdata = client.load_market_data(
@@ -150,12 +157,19 @@ def _standardize_column_names(df):
     # Apply column name mapping
     df = df.rename(columns=column_mapping)
     
+    # Debug: Print available columns after renaming
+    print(f"Columns after standardization: {list(df.columns)}")
+    
     # Ensure required columns exist (with fallback logic)
     if 'Ticker' not in df.columns:
         if 'Ticker-Region' in df.columns:
-            df['Ticker'] = df['Ticker-Region'].str.split('-').str[0].str.strip()
+            # Check if it's actually a string column
+            if df['Ticker-Region'].dtype == 'object' or pd.api.types.is_string_dtype(df['Ticker-Region']):
+                df['Ticker'] = df['Ticker-Region'].str.split('-').str[0].str.strip()
         elif 'ticker_region' in df.columns:
-            df['Ticker'] = df['ticker_region'].str.split('-').str[0].str.strip()
+            # Check if it's actually a string column
+            if df['ticker_region'].dtype == 'object' or pd.api.types.is_string_dtype(df['ticker_region']):
+                df['Ticker'] = df['ticker_region'].str.split('-').str[0].str.strip()
     
     if 'Year' not in df.columns:
         if 'Date' in df.columns:

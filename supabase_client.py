@@ -98,6 +98,10 @@ class SupabaseDataClient:
             # Convert to DataFrame
             df = pd.DataFrame(rows)
             
+            # Debug: Print loaded columns
+            print(f"Supabase columns loaded: {list(df.columns)}")
+            logger.info(f"Loaded {len(df)} rows from Supabase table '{table_name}'")
+            
             # Apply fossil fuel restrictions if needed
             if restrict_fossil_fuels:
                 df = self._apply_fossil_fuel_filter(df)
@@ -152,7 +156,13 @@ class SupabaseDataClient:
         
         # Ensure ticker column exists
         if 'ticker' not in df.columns and 'ticker_region' in df.columns:
-            df['ticker'] = df['ticker_region'].str.split('-').str[0].str.strip()
+            # Check if ticker_region is actually a string column
+            if df['ticker_region'].dtype == 'object' or pd.api.types.is_string_dtype(df['ticker_region']):
+                df['ticker'] = df['ticker_region'].str.split('-').str[0].str.strip()
+            else:
+                logger.warning(f"ticker_region column exists but is not a string type: {df['ticker_region'].dtype}")
+        elif 'ticker' not in df.columns and 'ticker_region' not in df.columns:
+            logger.warning("Neither 'ticker' nor 'ticker_region' columns found in data")
         
         # Ensure year column exists
         if 'year' not in df.columns and 'date' in df.columns:

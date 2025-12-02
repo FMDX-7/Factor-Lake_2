@@ -142,6 +142,7 @@ def calculate_growth(portfolio, next_market, current_market, verbosity=0):
         total_start_value += factor_portfolio.present_value(current_market)
 
     # Calculate end value using next market, handling missing stocks
+    # Strict fix: EXCLUDE positions with missing next-year price from end value to avoid neutralizing losses
     total_end_value = 0
     for factor_portfolio in portfolio:
         for inv in factor_portfolio.investments:
@@ -150,11 +151,10 @@ def calculate_growth(portfolio, next_market, current_market, verbosity=0):
             if end_price is not None:
                 total_end_value += inv["number_of_shares"] * end_price
             else:
-                entry_price = current_market.get_price(ticker)
-                if entry_price is not None:
-                    total_end_value += inv["number_of_shares"] * entry_price
-                    if verbosity == 3:
-                        print(f"{ticker} - Missing in {next_market.t}, liquidating at entry price: {entry_price}")
+                # Do NOT credit entry price; exclude from end value to prevent survivorship bias
+                if verbosity == 3:
+                    entry_price = current_market.get_price(ticker)
+                    print(f"{ticker} - Missing in {next_market.t}, excluding from end value (entry was {entry_price})")
 
     # Calculate growth
     growth = (total_end_value - total_start_value) / total_start_value if total_start_value else 0

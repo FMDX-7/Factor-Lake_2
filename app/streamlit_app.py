@@ -656,6 +656,9 @@ def main():
                                 top_end = top.get('end')
                                 bot_start = bot.get('start') if bot else None
                                 bot_end = bot.get('end') if bot else None
+                                # Show which tickers were dropped due to missing next-year prices
+                                dropped_top = top.get('dropped_tickers', [])
+                                dropped_bot = bot.get('dropped_tickers', []) if bot else []
                             else:
                                 # Fallback: call rebalance_portfolio directly to compute top/bottom series
                                 try:
@@ -768,6 +771,13 @@ def main():
                                     if benchmark_final is not None:
                                         alpha_top = ((top_metrics['end'] / benchmark_final) - 1) * 100
                                         st.metric(f"Top {cohort_pct}% Alpha vs Russell 2000", f"{alpha_top:.2f}%")
+                                    # List of dropped tickers for Top cohort
+                                    try:
+                                        if dropped_top:
+                                            with st.expander(f"Dropped tickers (Top {cohort_pct}%): {len(dropped_top)}", expanded=False):
+                                                st.write(", ".join(sorted(set(dropped_top))))
+                                    except Exception:
+                                        pass
                                 else:
                                     st.write(f"Top {cohort_pct}%: no final AUM available")
                             with col_bot:
@@ -778,6 +788,13 @@ def main():
                                     if benchmark_final is not None:
                                         alpha_bot = ((bot_metrics['end'] / benchmark_final) - 1) * 100
                                         st.metric(f"Bottom {cohort_pct}% Alpha vs Russell 2000", f"{alpha_bot:.2f}%")
+                                    # List of dropped tickers for Bottom cohort
+                                    try:
+                                        if dropped_bot:
+                                            with st.expander(f"Dropped tickers (Bottom {cohort_pct}%): {len(dropped_bot)}", expanded=False):
+                                                st.write(", ".join(sorted(set(dropped_bot))))
+                                    except Exception:
+                                        pass
                                 else:
                                     st.write(f"Bottom {cohort_pct}%: no final AUM available")
 

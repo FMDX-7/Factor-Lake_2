@@ -127,6 +127,7 @@ def plot_top_bottom_percent(rdata,
                     universe = 0
                     n_selected = 0
                     dropped = 0
+                    dropped_tickers = []
                     for factor in factors:
                         col = getattr(factor, 'column_name', str(factor))
                         if col in market.stocks.columns:
@@ -168,10 +169,11 @@ def plot_top_bottom_percent(rdata,
                                     continue
                                 exit_price = next_market.get_price(t)
                                 if exit_price is None and drop_missing_next_price:
+                                    dropped_tickers.append(t)
                                     continue
                                 valid.append(t)
                             dropped += (len(sel) - len(valid))
-                    return {'n_selected': n_selected, 'dropped': dropped}
+                    return {'n_selected': n_selected, 'dropped': dropped, 'dropped_tickers': dropped_tickers}
 
                 top_stats = compute_cohort_stats(True)
                 bot_stats = compute_cohort_stats(False) if show_bottom else None
@@ -212,6 +214,7 @@ def plot_top_bottom_percent(rdata,
                         'end': top_end,
                         'dropped': top_stats['dropped'],
                         'n_selected': top_stats['n_selected'],
+                        'dropped_tickers': top_stats.get('dropped_tickers', []),
                     },
                     'bottom': {
                         'positions': [],
@@ -220,6 +223,7 @@ def plot_top_bottom_percent(rdata,
                         'end': bot_end,
                         'dropped': bot_stats['dropped'] if bot_stats else 0,
                         'n_selected': bot_stats['n_selected'] if bot_stats else 0,
+                        'dropped_tickers': (bot_stats.get('dropped_tickers', []) if bot_stats else []),
                     }
                 }
                 details['per_year'].append(per_year)
@@ -271,8 +275,78 @@ def plot_top_bottom_percent(rdata,
             top_tickers = []
             universe_size_top = 0
             n_top = 0
-            
 
+            if selection_mode != 'by_factor':
+                raise ValueError(f"Unknown selection_mode: {selection_mode}. Inline selection only supports 'by_factor'.")
+
+            # Allocate equally across factors, then equally across selected tickers within each factor
+            n_factors = max(1, len(factors))
+            per_factor_alloc_t = top_values[-1] / n_factors
+            for factor in factors:
+                col = getattr(factor, 'column_name', str(factor))
+                if col in market.stocks.columns:
+                    series = pd.to_numeric(market.stocks[col], errors='coerce')
+                    grouped = series.groupby(series.index).mean().dropna()
+                    higher_is_better = FACTOR_DOCS.get(col, {}).get('higher_is_better', True)
+                    items = []
+                    for t, v in grouped.items():
+                        try:
+                            val = float(v)
+                        except Exception:
+                            continue
+                        score = val if higher_is_better else -val
+                        items.append((t, score))
+                else:
+                    items = []
+                    for t in market.stocks.index:
+                        try:
+                            v = factor.get(t, market)
+                        except Exception:
+                            v = None
+                        if v is None:
+                            continue
+                        try:
+                            items.append((t, float(v)))
+                        except Exception:
+                            continue
+                # stable sort: worst->best with deterministic tie-breaker
+                items = sorted(items, key=lambda x: (x[1], x[0]))  # worst->best
+                universe_size_top += len(items)
+                n = max(1, math.floor(len(items) * (percent / 100.0))) if items else 0
+                n_top += n
+                top_list = [t for t, _ in items[-n:]]
+                top_tickers.extend(top_list)
+                if top_list:
+                    # pre-filter valid tickers so per-factor allocation is fully invested
+                    valid = []
+                    for t in top_list:
+                        entry = market.get_price(t)
+                        if entry is None or entry <= 0:
+                            continue
+                        exit_price = next_market.get_price(t)
+                        if exit_price is None:
+                            if drop_missing_next_price:
+                                continue
+                            exit_price = entry
+                        valid.append((t, entry, exit_price))
+                    dropped = len(top_list) - len(valid)
+                    top_dropped += dropped
+                    top_factor_stats.append((col, len(top_list), len(valid), dropped))
+                    if valid:
+                        equal = per_factor_alloc_t / len(valid)
+                        for t, entry, exit_price in valid:
+                            shares = equal / entry
+                            start_top += shares * entry
+                            end_top += shares * exit_price
+                            try:
+                                r = (exit_price / entry) - 1.0
+                            except Exception:
+                                r = 0.0
+                            top_returns.append(r)
+                            top_positions.append({'ticker': t, 'entry': entry, 'exit': exit_price, 'shares': shares, 'weight': equal, 'return': r})
+
+            if end_top == 0:
+                end_top = top_values[-1]
             top_values.append(end_top)
 
             # Bottom cohort

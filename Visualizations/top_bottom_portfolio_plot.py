@@ -265,6 +265,13 @@ def plot_top_bottom_percent(rdata,
             # the canonical choice and is used by default. We do not compute
             # combined raw scores here.
 
+            # Build list of ALL available stocks in next_market for reallocation
+            all_available_stocks = []
+            for ticker in next_market.stocks.index:
+                price = next_market.get_price(ticker)
+                if price is not None and price > 0:
+                    all_available_stocks.append(ticker)
+
             # Top cohort
             start_top = 0.0
             end_top = 0.0
@@ -273,6 +280,7 @@ def plot_top_bottom_percent(rdata,
             top_dropped = 0
             # aggregate list for verbose printing (populated in both selection modes)
             top_tickers = []
+            dropped_top_tickers = []
             universe_size_top = 0
             n_top = 0
 
@@ -317,7 +325,7 @@ def plot_top_bottom_percent(rdata,
                 top_list = [t for t, _ in items[-n:]]
                 top_tickers.extend(top_list)
                 if top_list:
-                    # pre-filter valid tickers so per-factor allocation is fully invested
+                    # Filter to valid tickers - exclude those missing next-year prices
                     valid = []
                     for t in top_list:
                         entry = market.get_price(t)
@@ -326,14 +334,18 @@ def plot_top_bottom_percent(rdata,
                         exit_price = next_market.get_price(t)
                         if exit_price is None:
                             if drop_missing_next_price:
+                                dropped_top_tickers.append(t)
                                 continue
                             exit_price = entry
                         valid.append((t, entry, exit_price))
+                    
                     dropped = len(top_list) - len(valid)
                     top_dropped += dropped
                     top_factor_stats.append((col, len(top_list), len(valid), dropped))
+                    
+                    # Allocate only to valid tickers (dropped capital is lost)
                     if valid:
-                        equal = per_factor_alloc_t / len(valid)
+                        equal = per_factor_alloc_t / len(top_list)
                         for t, entry, exit_price in valid:
                             shares = equal / entry
                             start_top += shares * entry
@@ -353,6 +365,7 @@ def plot_top_bottom_percent(rdata,
             universe_size_bot = None
             n_bot = 0
             bottom_tickers = []
+            dropped_bottom_tickers = []
             bot_dropped = 0
             # initialize these so verbose diagnostics don't reference possibly-unbound names
             start_bottom = 0.0
@@ -368,6 +381,7 @@ def plot_top_bottom_percent(rdata,
                 per_factor_alloc_b = bottom_values[-1] / n_factors
                 universe_size_bot = 0
                 n_bot = 0
+                total_dropped_capital_bot = 0.0
                 # per-factor diagnostics for bottom
                 bottom_factor_stats = []
                 for factor in factors:
@@ -408,8 +422,9 @@ def plot_top_bottom_percent(rdata,
                     # collect tickers for verbose diagnostics
                     bottom_tickers.extend(bot_list)
                     if bot_list:
-                        # pre-filter valid tickers so per-factor allocation is fully invested
-                        valid = []
+                        # First pass: identify surviving and dropped positions
+                        surviving = []
+                        dropped_capital = 0.0
                         for t in bot_list:
                             entry = market.get_price(t)
                             if entry is None or entry <= 0:
@@ -417,16 +432,24 @@ def plot_top_bottom_percent(rdata,
                             exit_price = next_market.get_price(t)
                             if exit_price is None:
                                 if drop_missing_next_price:
+                                    # Add entry capital to redistribution pool
+                                    dropped_capital += (per_factor_alloc_b / len(bot_list))
+                                    dropped_bottom_tickers.append(t)
                                     continue
                                 exit_price = entry
-                            valid.append((t, entry, exit_price))
-                        dropped = len(bot_list) - len(valid)
+                            surviving.append((t, entry, exit_price))
+                        
+                        dropped = len(bot_list) - len(surviving)
                         bot_dropped += dropped
-                        bottom_factor_stats.append((col, len(bot_list), len(valid), dropped))
-                        if valid:
-                            equal = per_factor_alloc_b / len(valid)
-                            for t, entry, exit_price in valid:
-                                shares = equal / entry
+                        bottom_factor_stats.append((col, len(bot_list), len(surviving), dropped))
+                        total_dropped_capital_bot += dropped_capital
+                        
+                        # Calculate base allocation (no reallocation within cohort)
+                        if surviving:
+                            base_alloc = per_factor_alloc_b / len(bot_list)
+                            for t, entry, exit_price in surviving:
+                                # Base allocation only (dropped capital goes to market)
+                                shares = base_alloc / entry
                                 start_bottom += shares * entry
                                 end_bottom += shares * exit_price
                                 try:
@@ -434,7 +457,12 @@ def plot_top_bottom_percent(rdata,
                                 except Exception:
                                     r = 0.0
                                 bottom_returns.append(r)
-                                bottom_positions.append({'ticker': t, 'entry': entry, 'exit': exit_price, 'shares': shares, 'weight': equal, 'return': r})
+                                bottom_positions.append({'ticker': t, 'entry': entry, 'exit': exit_price, 'shares': shares, 'weight': base_alloc, 'return': r})
+                
+                # Add dropped capital back (redistributed across entire market at market return)
+                if all_available_stocks and total_dropped_capital_bot > 0:
+                    end_bottom += total_dropped_capital_bot
+
                 if end_bottom == 0:
                     end_bottom = bottom_values[-1]
                 bottom_values.append(end_bottom)
@@ -514,6 +542,7 @@ def plot_top_bottom_percent(rdata,
                     'end': end_top,
                     'dropped': top_dropped,
                     'n_selected': n_top,
+                    'dropped_tickers': dropped_top_tickers,
                 },
                 'bottom': {
                     'positions': bottom_positions,
@@ -522,6 +551,7 @@ def plot_top_bottom_percent(rdata,
                     'end': end_bottom,
                     'dropped': bot_dropped,
                     'n_selected': n_bot,
+                    'dropped_tickers': dropped_bottom_tickers,
                 }
             }
             details['years'].append(year)

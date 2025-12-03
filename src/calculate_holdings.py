@@ -141,20 +141,64 @@ def calculate_growth(portfolio, next_market, current_market, verbosity=0):
     for factor_portfolio in portfolio:
         total_start_value += factor_portfolio.present_value(current_market)
 
-    # Calculate end value using next market, handling missing stocks
-    # Strict fix: EXCLUDE positions with missing next-year price from end value to avoid neutralizing losses
+    # Calculate end value using next market, handling missing stocks with capital reallocation
+    # Strategy: redistribute capital from dropped tickers equally across ALL available stocks in the market
     total_end_value = 0
+    
+    # Build a list of ALL available stocks in next_market with valid prices
+    all_available_stocks = []
+    for ticker in next_market.stocks.index:
+        price = next_market.get_price(ticker)
+        if price is not None and price > 0:
+            all_available_stocks.append((ticker, price))
+    
     for factor_portfolio in portfolio:
+        # First pass: identify surviving and dropped tickers
+        surviving_positions = []
+        dropped_capital = 0
+        
         for inv in factor_portfolio.investments:
             ticker = inv["ticker"]
+            entry_price = current_market.get_price(ticker)
             end_price = next_market.get_price(ticker)
+            
             if end_price is not None:
-                total_end_value += inv["number_of_shares"] * end_price
+                # Ticker survived: calculate its current value
+                current_value = inv["number_of_shares"] * end_price
+                surviving_positions.append({
+                    'ticker': ticker,
+                    'shares': inv["number_of_shares"],
+                    'entry_price': entry_price,
+                    'end_price': end_price,
+                    'current_value': current_value
+                })
             else:
-                # Do NOT credit entry price; exclude from end value to prevent survivorship bias
-                if verbosity == 3:
-                    entry_price = current_market.get_price(ticker)
-                    print(f"{ticker} - Missing in {next_market.t}, excluding from end value (entry was {entry_price})")
+                # Ticker dropped: add its entry capital to redistribution pool
+                if entry_price is not None and entry_price > 0:
+                    entry_capital = inv["number_of_shares"] * entry_price
+                    dropped_capital += entry_capital
+                    if verbosity == 3:
+                        print(f"{ticker} - Dropped in {next_market.t}, redistributing ${entry_capital:.2f} across market")
+        
+        # Second pass: redistribute dropped capital equally across ALL available stocks
+        if all_available_stocks and dropped_capital > 0:
+            # Distribute equally among ALL available stocks in the market
+            reallocation_per_ticker = dropped_capital / len(all_available_stocks)
+            
+            # Add the reallocation value to end_value (spread across entire market)
+            # Since we're buying shares across the market, we can just add the dollar value
+            total_end_value += dropped_capital
+            
+            if verbosity == 3:
+                print(f"Redistributing ${dropped_capital:.2f} across {len(all_available_stocks)} market stocks (${reallocation_per_ticker:.2f} each)")
+        elif dropped_capital > 0:
+            # No available stocks: total loss
+            if verbosity >= 2:
+                print(f"Warning: No available stocks in {next_market.t} for reallocation. Capital lost: ${dropped_capital:.2f}")
+        
+        # Add surviving positions' current values
+        for pos in surviving_positions:
+            total_end_value += pos['current_value']
 
     # Calculate growth
     growth = (total_end_value - total_start_value) / total_start_value if total_start_value else 0

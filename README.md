@@ -1,57 +1,88 @@
 # Factor-Lake
 
-**Interactive Factor-Based Portfolio Analysis Tool**
+An interactive factor-investing toolkit with a clean Streamlit UI, Supabase data integration, and a pytest test suite. The codebase uses a modern `src/` layout and a clean UX.
 
-[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/FMDX-7/Factor-Lake_2/blob/main/colab_setup.ipynb)
+## Use the App
 
-## Quick Start
+- Hosted: Share your Streamlit Community Cloud app URL. Users only need the link to use the app.
+- Password: Set a secret named `password` in your app’s Settings → Secrets. Locally you can use `.streamlit/secrets.toml`.
 
-### Run on Google Colab (No Installation Required)
-**Click the badge above** or see [Colab Instructions](COLAB_INSTRUCTIONS.md)
-
-### Run Locally
-```bash
-# Install dependencies
-pip install -r requirements.txt
-
-# Run the app
-python run_streamlit.py
+Example secrets (TOML):
+```
+password = "your-strong-password"
 ```
 
-Open http://localhost:8501 in your browser
+## Quick Start (Local)
+
+```pwsh
+git clone https://github.com/cornell-sysen-5900/Factor-Lake.git
+cd Factor-Lake
+pip install -r requirements.txt
+python -m streamlit run .\app\streamlit_app.py
+```
+
+Then open http://localhost:8501
 
 ## Features
 
-- **Factor Selection**: 13+ investment factors (Momentum, Value, Quality, Growth, Profitability)
-- **ESG Filters**: Exclude fossil fuel companies
-- **Sector Filters**: Focus on specific industries
-- **Backtesting**: Historical performance from 2002-2023
-- **Benchmark Comparison**: Compare vs Russell 2000
-- **Interactive Charts**: Visualize portfolio growth
-- **Export Results**: Download performance data as CSV
+- Clean factor selection (13 core factors: Momentum, Value, Quality, Growth, Profitability)
+- ESG exclusion (fossil fuel filter)
+- Sector filtering (5-sector classification)
+- Supabase data loading with column normalization
+- Annual rebalancing backtest (2002–2023)
+- Benchmark comparison vs Russell 2000
+- Performance metrics: CAGR, yearly returns, drawdown, Sharpe, Information Ratio, win rate
+- Downloadable performance table
 
-## Project Structure
+## Project Layout
 
 ```
-Factor-Lake_2/
-├── src/                    # Source code
-├── streamlit_app.py        # Web interface
-├── colab_setup.ipynb       # Google Colab notebook
-├── requirements.txt        # Dependencies
+Factor-Lake/
+├── app/                    # Streamlit entrypoints
+│   └── streamlit_app.py    # Main UI
+├── src/                    # Library & core logic
+│   ├── market_object.py
+│   ├── calculate_holdings.py
+│   ├── factor_function.py
+│   ├── portfolio.py
+│   ├── sector_selection.py
+│   ├── supabase_client.py
+│   └── ...
+├── Visualizations/         # Plot helpers
+├── UnitTests/              # Pytest suite
+├── scripts/                # CI / helper scripts
+├── DOCS/                   # Supplementary documentation
+├── requirements.txt
 └── README.md
+```
+
+## Import Conventions
+
+Always import from `src`:
+```python
+from src.market_object import load_data
+from src.calculate_holdings import rebalance_portfolio
 ```
 
 ## Documentation
 
-- [Colab Instructions](COLAB_INSTRUCTIONS.md) - Run on Google Colab
-- [Streamlit Styling Guide](STREAMLIT_STYLING_GUIDE.md) - Customize the interface
-- [Supabase Setup](SUPABASE_SETUP.md) - Database configuration
+- `DOCS/STREAMLIT_README.md` – UI overview
+- `DOCS/STREAMLIT_STYLING_GUIDE.md` – Styling / customization
+- `DOCS/SUPABASE_SETUP.md` – Environment & table notes
+- `DOCS/REORGANIZATION_SUMMARY.md` – Refactor rationale
+
+## Deployment
+
+For detailed deployment instructions (Streamlit Community Cloud, secrets management, and troubleshooting), see `DOCS/DEPLOYMENT.md`.
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for contribution guidelines.
+1. Create a feature branch from `main`.
+2. Add/modify tests in `UnitTests/` or `tests/`.
+3. Run `pytest -q` to verify.
+4. Submit a PR describing UX/data impacts.
 
 ## License
 
-See LICENSE file for details.
- 
+See `LICENSE` for details.
+

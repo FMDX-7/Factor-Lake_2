@@ -2,9 +2,10 @@
 
 ## Your Supabase Configuration
 
-Your Factor-Lake project is configured to use Supabase with these credentials:
-- **URL:** `https://ozusfgnnzanaxpcfidbm.supabase.co`
-- **Key:** `sb_publishable_PyVKM3BdygFWVdeZrirAVA_AxZFyNAA`
+Your Factor-Lake project is configured to use Supabase with these credentials: 
+
+- **URL:** `https://-----.supabase.co`
+- **Key:** `sb_publishable_-----`
 
 ## ✅ Setup Complete!
 
@@ -20,6 +21,7 @@ Your credentials are now configured in **three places**:
 - No code changes needed when running locally
 
 ### 3. **Google Colab** (`colab_setup.ipynb`)
+ *Now Obsolete as of Dec 1, 2025*
 - Credentials are set directly in the notebook
 - Ready to use when deployed to Colab
 
@@ -45,7 +47,7 @@ python run_streamlit.py
 
 ✅ **Local `.env` file** - Protected by .gitignore (won't push to GitHub)  
 ✅ **Supabase key is publishable** - Safe to use on client-side  
-⚠️ **Colab notebook** - Contains credentials, but that's OK for personal use  
+⚠️ **Colab notebook currently outdated** - Contains credentials, but that's OK for personal use  
 
 If you need to share the project publicly:
 - Keep the `.env` file local only
